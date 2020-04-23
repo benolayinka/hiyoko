@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import * as THREE from 'three'
+import { CSSTransition } from 'react-transition-group'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { setContent } from '@bit/benolayinka.benolayinka.utils'
 import ThreeSceneRenderer from '@bit/benolayinka.benolayinka.three-scene-renderer'
@@ -9,6 +10,9 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import { GUI } from 'three/examples/jsm/libs/dat.gui.module.js';
 
 function App() {
+
+	const [showLoading, setShowLoading] = useState(true);
+	const [showText, setShowText] = useState(true);
 
   	var canvas, renderer, scene, camera, clock, mixer, controls
 
@@ -42,6 +46,14 @@ function App() {
 	  	var avatar = new THREE.Object3D()
 
 	  	scene.add(avatar)
+
+	  	//trigger onLoaded callback when all assets are loaded
+	    THREE.DefaultLoadingManager.onLoad = () => {
+	        //console.log( 'Done loading ');
+	        if(typeof onLoad === 'function'){
+	        	onLoad()
+	        }
+	    };
 
 	  	let loader = new GLTFLoader()
 
@@ -464,8 +476,40 @@ function App() {
 
 	}
 
+	function onLoad(){
+		setShowText(false)
+	}
+
+	function onTextFade(){
+		setShowLoading(false)
+	}
+
 	return (
 		<div className="App">
+			<CSSTransition
+					in={showLoading}
+					unmountOnExit
+					timeout={1200}
+					classNames="fade"
+			>
+				<div className='h-100 w-100 position-absolute z-9 bg d-flex flex-column justify-content-center align-items-center'>
+					<CSSTransition
+							in={showText}
+							unmountOnExit
+							timeout={1200}
+							classNames="fade"
+							onExited={onTextFade}
+					>
+						<div className = 'd-flex justify-content-center'>
+							<h1>Loading
+							<span className='bounce'>.</span>
+							<span className='bounce'>.</span>
+							<span className='bounce'>.</span>
+							</h1>
+						</div>
+					</CSSTransition>
+				</div>
+			</CSSTransition>
 			<ThreeSceneRenderer 
 				className='h-100 w-100 position-fixed bg-gradient' 
 				adaptToDeviceRatio 

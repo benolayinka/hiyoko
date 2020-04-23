@@ -1,3 +1,19 @@
 .bg-gradient {
-	background-image: linear-gradient(white, pink);
+	background-image: linear-gradient(#ffffff, #d6d6d6);
+}
+a {
+	color: #f00;
+}
+.ac {  /* prevent dat-gui from being selected */
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	-ms-user-select: none;
+	user-select: none;
+}
+.no-pointer-events {
+	pointer-events: none;
+}
+.control-disabled {
+	color: #888;
+	text-decoration: line-through;
 }

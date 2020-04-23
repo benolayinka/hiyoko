@@ -14,6 +14,8 @@ function App() {
 
   	var model, skeleton
 
+  	var text, inc = 0
+
 	var crossFadeControls = [];
 
 	var fightAction, tposeAction, punchAction;
@@ -51,6 +53,10 @@ function App() {
 	  		gltf.scene.traverse((mesh)=>{
 
 	  			mesh.frustumCulled = false
+
+	  			if(mesh.userData.text){
+	  				text = mesh
+	  			}
 
 				if(mesh.isSkinnedMesh) {
 					const helper = new THREE.BoxHelper(mesh);
@@ -134,6 +140,9 @@ function App() {
 		if(mixer){
 	  		mixer.update(mixerUpdateDelta)
 		}
+
+		const scale = 1 + 0.02 * Math.sin(0.1 * inc++)
+		text.scale.set(scale, scale, scale)
 
     	controls.update();
 

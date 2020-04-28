@@ -153,8 +153,8 @@ function App() {
 	  		mixer.update(mixerUpdateDelta)
 		}
 
-		const scale = 1 + 0.02 * Math.sin(0.1 * inc++)
-		text.scale.set(scale, scale, scale)
+		//const scale = 1 + 0.02 * Math.sin(0.1 * inc++)
+		//text.scale.set(scale, scale, scale)
 
     	controls.update();
 

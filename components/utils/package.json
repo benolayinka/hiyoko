@@ -1,0 +1,17 @@
+{
+  "name": "@bit/benolayinka.benolayinka.utils",
+  "version": "0.0.7",
+  "homepage": "https://bit.dev/benolayinka/benolayinka/utils",
+  "main": "dist/utils.js",
+  "dependencies": {},
+  "devDependencies": {},
+  "peerDependencies": {
+    "three": "*"
+  },
+  "license": "SEE LICENSE IN LICENSE",
+  "bit": {
+    "env": {
+      "compiler": "bit.envs/compilers/babel@7.0.4"
+    }
+  }
+}

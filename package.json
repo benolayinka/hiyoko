@@ -1,20 +1,30 @@
 {
-  "name": "three-boostrap-react-starter",
+  "name": "hiyoko",
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@bit/benolayinka.benolayinka.emoji": "0.0.1",
     "@bit/benolayinka.benolayinka.three-scene-renderer": "0.0.4",
-    "@bit/benolayinka.benolayinka.utils": "0.0.6",
+    "@bit/benolayinka.benolayinka.utils": "file:components/utils",
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.3.2",
     "@testing-library/user-event": "^7.1.2",
     "bootstrap": "^4.4.1",
+    "cannon": "^0.6.2",
+    "cannon-es": "^0.9.1",
+    "node-sass": "^4.14.1",
     "react": "^16.13.1",
     "react-bootstrap": "^1.0.0",
+    "react-device-detect": "^1.12.1",
     "react-dom": "^16.13.1",
+    "react-howler": "^3.7.4",
+    "react-icons": "^3.10.0",
+    "react-nipple": "^1.0.2",
     "react-scripts": "3.4.1",
     "react-transition-group": "^4.3.0",
-    "three": "^0.115.0"
+    "three": "^0.115.0",
+    "three-to-cannon": "^2.1.0",
+    "three.interaction": "^0.2.2"
   },
   "peerDependencies": {
     "react": ">=16.9.0",
@@ -40,5 +50,10 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "bit": {
+    "env": {},
+    "componentsDefaultDirectory": "components/{name}",
+    "packageManager": "npm"
   }
 }

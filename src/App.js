@@ -1,41 +1,66 @@
-import React, { useState } from 'react';
+import React, {useState} from 'react';
 import './App.css';
 import 'bootstrap/dist/css/bootstrap.min.css';
 import * as THREE from 'three'
-import { CSSTransition } from 'react-transition-group'
+import * as CANNON from 'cannon-es'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
-import { setContent } from '@bit/benolayinka.benolayinka.utils'
+import { setContent, showEdges, setEdgeColor, setEdgeWidth } from '@bit/benolayinka.benolayinka.utils'
 import ThreeSceneRenderer from '@bit/benolayinka.benolayinka.three-scene-renderer'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GUI } from 'three/examples/jsm/libs/dat.gui.module.js';
+import { Interaction } from 'three.interaction';
+import ReactHowler from 'react-howler';
+import { CSSTransition } from 'react-transition-group'
+import Emoji from '@bit/benolayinka.benolayinka.emoji'
+import {isIOS} from 'react-device-detect';
+import { FaVolumeUp } from 'react-icons/fa';
+import Gamepad from './components/Gamepad'
+import GamepadControls from './GamepadControls'
+
+const NEAR = 0.01, FAR = 1000, FOV = 60, ASPECT = 16/9
+
+var actions //fucking js
+
+var canvas, renderer, scene, camera, clock, mixer, controls
+
+var controlLoopRunning = false
+
+var gpControls
+
+const gamepadData = {
+            driveJoystickData: {x:0, y:0},
+            lookJoystickData: {x:0, y:0},
+            buttonsPressed: {0:false, 1:false, 2:false},
+            keysPressed: {},
+        }
+
+var kick, wait, run
+
+var currentAction
+
+var interaction
+
+var character
+
+var pos = {}
+
+var shape
 
 function App() {
 
+	const [playing, setPlaying] = useState(false);
 	const [showLoading, setShowLoading] = useState(true);
-	const [showText, setShowText] = useState(true);
+	const [showLoadingText, setShowLoadingText] = useState(true);
 
-  	var canvas, renderer, scene, camera, clock, mixer, controls
+  	function extendScene(props){
 
-  	var model, skeleton
-
-  	var text, inc = 0
-
-	var crossFadeControls = [];
-
-	var fightAction, tposeAction, punchAction;
-	var fightWeight, tposeWeight, punchWeight;
-	var actions, settings;
-
-	var singleStepMode = false;
-	var sizeOfNextStep = 0;
-
-  	function createScene(props){
+  		//trigger onLoaded callback when all assets are loaded
+	    THREE.DefaultLoadingManager.onLoad = () => {
+	        setShowLoadingText(false)
+		};
 
 		({canvas, renderer} = props)
 
 		scene = new THREE.Scene()
-
-		const NEAR = 0.01, FAR = 1000, FOV = 60, ASPECT = 16/9
 
 	  	camera = new THREE.PerspectiveCamera(FOV, ASPECT, NEAR, FAR);
 
@@ -43,258 +68,86 @@ function App() {
 
 		clock = new THREE.Clock()
 
-	  	var avatar = new THREE.Object3D()
-
-	  	scene.add(avatar)
-
-	  	//trigger onLoaded callback when all assets are loaded
-	    THREE.DefaultLoadingManager.onLoad = () => {
-	        //console.log( 'Done loading ');
-	        if(typeof onLoad === 'function'){
-	        	onLoad()
-	        }
-	    };
+		interaction = new Interaction(renderer, scene, camera);
 
 	  	let loader = new GLTFLoader()
 
 	  	loader.load('assets/samurai_animated.glb', (gltf)=>{
 
-	  		model = gltf.scene
-
-	  		//fix for Box3.setFromObject doesn't calc bounding boxes
 	  		gltf.scene.traverse((mesh)=>{
 
-	  			mesh.frustumCulled = false
-
-	  			if(mesh.userData.text){
-	  				text = mesh
-	  			}
-
 				if(mesh.isSkinnedMesh) {
+					const skeletonHelper = new THREE.SkeletonHelper( mesh.skeleton.bones[ 0 ].parent );
+					scene.add(skeletonHelper)
+					skeletonHelper.visible = false
+
+					character = mesh.skeleton.bones[ 0 ].parent
+					mesh.frustumCulled = false
+
 					const helper = new THREE.BoxHelper(mesh);
-					helper.visible = false
-					avatar.add(helper)
+	  				scene.add(helper)
+	  				helper.visible = false
+
+	  				controlLoopRunning = true
 				}
 	  		})
 
-	  		skeleton = new THREE.SkeletonHelper( gltf.scene );
-			skeleton.visible = false;
-			scene.add( skeleton );
-
-			createPanel();
-
 			mixer = new THREE.AnimationMixer( gltf.scene );
 
-			var animations = gltf.animations;
+			wait = mixer.clipAction(gltf.animations[0])
+			run = mixer.clipAction(gltf.animations[1])
+			kick = mixer.clipAction(gltf.animations[2])
 
-			fightAction = mixer.clipAction( animations[ 0 ] );
-			tposeAction = mixer.clipAction( animations[ 2 ] );
-			punchAction = mixer.clipAction( animations[ 1 ] );
+			actions = [kick, wait, run]
 
-			actions = [ punchAction, fightAction, tposeAction ];
+			activateAllActions()
 
-			activateAllActions();
+			playAction(run)
 
 			scene.add(gltf.scene)
 
-			setContent(avatar, camera, controls)
+			// controls.autoRotate = true
+			// controls.autoRotateSpeed = 0.7
+			controls.zoomSpeed = 0.2
+			controls.rotateSpeed = 0.2
+			controls.enableKeys = false
+			camera.near = 0.01
+			camera.updateProjectionMatrix()
+			camera.position.z += 6
 
-			animate()
+			setContent(scene, camera, controls)
+			//setContent(scene, camera)
+			//camera.position.y += 1
+			//camera.position.z -= 2
+
 	  	})
 
-	  	let spotLight = new THREE.SpotLight(0xffffff, 1)
+	  	let spotLight = new THREE.SpotLight('white', 1)
 	  	spotLight.position.set(45, 50, 15);
 	  	scene.add(spotLight);
 
-	  	let ambLight = new THREE.AmbientLight(0xffffff, 0.5);
-	  	ambLight.position.set(5, 3, 5);
-	  	scene.add(ambLight);
+	  	let pointLight = new THREE.PointLight('white', 1)
+	  	spotLight.position.set(0, 5, -5);
+	  	scene.add(spotLight);
 
-	  	window.addEventListener('resize', handleWindowResize)
+	  	var ambientLight = new THREE.AmbientLight('white', 1)
+	  	scene.add(ambientLight)
+
+	  	var light = new THREE.HemisphereLight( 'white', 'pink', 1 );
+	  	scene.add(light)
+
+		window.addEventListener('resize', handleWindowResize)
 
 	  	handleWindowResize()
+
+	  	animate()
   	}
 
-  	function handleWindowResize(){
-		let width = canvas.clientWidth;
-		let height = canvas.clientHeight;
-		camera.aspect = width/height;
-		camera.updateProjectionMatrix();
-	}
+  	function activateAllActions() {
 
-  	function animate(){
-
-  		tposeWeight = tposeAction.getEffectiveWeight();
-		fightWeight = fightAction.getEffectiveWeight();
-		punchWeight = punchAction.getEffectiveWeight();
-
-		// Update the panel values if weights are modified from "outside" (by crossfadings)
-
-		updateWeightSliders();
-
-		// Enable/disable crossfade controls according to current weight values
-
-		updateCrossFadeControls();
-
-		// Get the time elapsed since the last frame, used for mixer update (if not in single step mode)
-
-		var mixerUpdateDelta = clock.getDelta();
-
-		// If in single step mode, make one step and then do nothing (until the user clicks again)
-
-		if ( singleStepMode ) {
-
-			mixerUpdateDelta = sizeOfNextStep;
-			sizeOfNextStep = 0;
-
-		}
-
-		if(mixer){
-	  		mixer.update(mixerUpdateDelta)
-		}
-
-		//const scale = 1 + 0.02 * Math.sin(0.1 * inc++)
-		//text.scale.set(scale, scale, scale)
-
-    	controls.update();
-
-		renderer.render(scene, camera)
-
-		requestAnimationFrame(animate)
-  	}
-
-  	function createPanel() {
-
-		var panel = new GUI( { width: 310 } );
-
-		var folder1 = panel.addFolder( 'Visibility' );
-		var folder2 = panel.addFolder( 'Activation/Deactivation' );
-		var folder3 = panel.addFolder( 'Pausing/Stepping' );
-		var folder4 = panel.addFolder( 'Crossfading' );
-		var folder5 = panel.addFolder( 'Blend Weights' );
-		var folder6 = panel.addFolder( 'General Speed' );
-
-		settings = {
-			'show model': true,
-			'show skeleton': false,
-			'deactivate all': deactivateAllActions,
-			'activate all': activateAllActions,
-			'pause/continue': pauseContinue,
-			'make single step': toSingleStepMode,
-			'modify step size': 0.05,
-			'from punch to fight': function () {
-
-				prepareCrossFade( punchAction, fightAction, 1.0 );
-
-			},
-			'from fight to punch': function () {
-
-				prepareCrossFade( fightAction, punchAction, 0.5 );
-
-			},
-			'use default duration': true,
-			'set custom duration': 3.5,
-			'modify fight weight': 1.0,
-			'modify tpose weight': 0.0,
-			'modify punch weight': 0.0,
-			'modify time scale': 1.0
-		};
-
-		folder1.add( settings, 'show model' ).onChange( showModel );
-		folder1.add( settings, 'show skeleton' ).onChange( showSkeleton );
-		folder2.add( settings, 'deactivate all' );
-		folder2.add( settings, 'activate all' );
-		folder3.add( settings, 'pause/continue' );
-		folder3.add( settings, 'make single step' );
-		folder3.add( settings, 'modify step size', 0.01, 0.1, 0.001 );
-		crossFadeControls.push( folder4.add( settings, 'from punch to fight' ) );
-		crossFadeControls.push( folder4.add( settings, 'from fight to punch' ) );
-		folder4.add( settings, 'use default duration' );
-		folder4.add( settings, 'set custom duration', 0, 10, 0.01 );
-		folder5.add( settings, 'modify fight weight', 0.0, 1.0, 0.01 ).listen().onChange( function ( weight ) {
-
-			setWeight( fightAction, weight );
-
-		} );
-		folder5.add( settings, 'modify tpose weight', 0.0, 1.0, 0.01 ).listen().onChange( function ( weight ) {
-
-			setWeight( tposeAction, weight );
-
-		} );
-		folder5.add( settings, 'modify punch weight', 0.0, 1.0, 0.01 ).listen().onChange( function ( weight ) {
-
-			setWeight( punchAction, weight );
-
-		} );
-		folder6.add( settings, 'modify time scale', 0.0, 1.5, 0.01 ).onChange( modifyTimeScale );
-
-		folder1.open();
-		folder2.open();
-		folder3.open();
-		folder4.open();
-		folder5.open();
-		folder6.open();
-
-		crossFadeControls.forEach( function ( control ) {
-
-			control.classList1 = control.domElement.parentElement.parentElement.classList;
-			control.classList2 = control.domElement.previousElementSibling.classList;
-
-			control.setDisabled = function () {
-
-				control.classList1.add( 'no-pointer-events' );
-				control.classList2.add( 'control-disabled' );
-
-			};
-
-			control.setEnabled = function () {
-
-				control.classList1.remove( 'no-pointer-events' );
-				control.classList2.remove( 'control-disabled' );
-
-			};
-
-		} );
-
-	}
-
-
-	function showModel( visibility ) {
-
-		model.visible = visibility;
-
-	}
-
-
-	function showSkeleton( visibility ) {
-
-		skeleton.visible = visibility;
-
-	}
-
-
-	function modifyTimeScale( speed ) {
-
-		mixer.timeScale = speed;
-
-	}
-
-
-	function deactivateAllActions() {
-
-		actions.forEach( function ( action ) {
-
-			action.stop();
-
-		} );
-
-	}
-
-	function activateAllActions() {
-
-		setWeight( fightAction, settings[ 'modify fight weight' ] );
-		setWeight( tposeAction, settings[ 'modify tpose weight' ] );
-		setWeight( punchAction, settings[ 'modify punch weight' ] );
+  		setWeight(wait, 1)
+  		setWeight(run, 0)
+  		setWeight(kick, 0)
 
 		actions.forEach( function ( action ) {
 
@@ -304,96 +157,29 @@ function App() {
 
 	}
 
-	function pauseContinue() {
+	// This function is needed, since animationAction.crossFadeTo() disables its start action and sets
+	// the start action's timeScale to ((start animation's duration) / (end animation's duration))
 
-		if ( singleStepMode ) {
+	function setWeight( action, weight ) {
 
-			singleStepMode = false;
-			unPauseAllActions();
-
-		} else {
-
-			if ( fightAction.paused ) {
-
-				unPauseAllActions();
-
-			} else {
-
-				pauseAllActions();
-
-			}
-
-		}
+		action.enabled = true;
+		action.setEffectiveTimeScale( 1 );
+		action.setEffectiveWeight( weight );
 
 	}
 
-	function pauseAllActions() {
-
-		actions.forEach( function ( action ) {
-
-			action.paused = true;
-
-		} );
-
-	}
-
-	function unPauseAllActions() {
-
-		actions.forEach( function ( action ) {
-
-			action.paused = false;
-
-		} );
-
-	}
-
-	function toSingleStepMode() {
-
-		unPauseAllActions();
-
-		singleStepMode = true;
-		sizeOfNextStep = settings[ 'modify step size' ];
-
-	}
-
-	function prepareCrossFade( startAction, endAction, defaultDuration ) {
-
-		// Switch default / custom crossfade duration (according to the user's choice)
-
-		var duration = setCrossFadeDuration( defaultDuration );
-
-		// Make sure that we don't go on in singleStepMode, and that all actions are unpaused
-
-		singleStepMode = false;
-		unPauseAllActions();
+  	function prepareCrossFade( startAction, endAction, defaultDuration ) {
 
 		// If the current action is 'fight' (duration 4 sec), execute the crossfade immediately;
 		// else wait until the current action has finished its current loop
 
-		if(1) {
-		//if ( startAction === fightAction ) {
+		if ( startAction === kick ) {
 
-			executeCrossFade( startAction, endAction, duration );
-
-		} else {
-
-			synchronizeCrossFade( startAction, endAction, duration );
-
-		}
-
-	}
-
-	function setCrossFadeDuration( defaultDuration ) {
-
-		// Switch default crossfade duration <-> custom crossfade duration
-
-		if ( settings[ 'use default duration' ] ) {
-
-			return defaultDuration;
+			synchronizeCrossFade( startAction, endAction, defaultDuration );
 
 		} else {
 
-			return settings[ 'set custom duration' ];
+			executeCrossFade( startAction, endAction, defaultDuration );
 
 		}
 
@@ -427,94 +213,223 @@ function App() {
 
 		// Crossfade with warping - you can also try without warping by setting the third parameter to false
 
-		startAction.crossFadeTo( endAction, duration, true );
+		startAction.crossFadeTo( endAction, duration, false );
 
 	}
 
-	// This function is needed, since animationAction.crossFadeTo() disables its start action and sets
-	// the start action's timeScale to ((start animation's duration) / (end animation's duration))
+  	function playAction(action){
 
-	function setWeight( action, weight ) {
+  		if(!currentAction)
+  			currentAction = action
 
-		action.enabled = true;
-		action.setEffectiveTimeScale( 1 );
-		action.setEffectiveWeight( weight );
+  		if(action === currentAction)
+  			return
 
+  		prepareCrossFade(currentAction, action, 0.5)
+
+  		currentAction = action
+  	}
+
+  	function handleWindowResize(){
+		let width = canvas.clientWidth;
+		let height = canvas.clientHeight;
+		camera.aspect = width/height;
+		camera.updateProjectionMatrix();
 	}
 
-	// Called by the render loop
+	function controlLoop(character, data){
 
-	function updateWeightSliders() {
+		var range = 90
 
-		settings[ 'modify fight weight' ] = fightWeight;
-		settings[ 'modify tpose weight' ] = tposeWeight;
-		settings[ 'modify punch weight' ] = punchWeight;
+        var moveY,moveX, lookX, lookY
+        moveY = moveX = lookY = lookX = 0
 
+		//back, or key s = 83
+        if(gamepadData.buttonsPressed[0] || gamepadData.keysPressed['83'])
+            moveY -= range
+
+        //forward, button 1 or key w = 87
+        if(gamepadData.buttonsPressed[1] || gamepadData.keysPressed['87'])
+            moveY += range
+
+		//right, or key d = 68
+        if(gamepadData.keysPressed['68'])
+            moveX += range
+
+        //left, or key a = 65
+        if(gamepadData.keysPressed['65'])
+            moveX -= range
+
+        //lookUp, i = 73
+        if(gamepadData.keysPressed['73'])
+            lookY += range
+
+        //lookLeft, j=74
+        if(gamepadData.keysPressed['74'])
+            lookX -= range
+
+        //lookDown, k=75
+        if(gamepadData.keysPressed['75'])
+            lookY -= range
+        
+        //lookRight l=76
+        if(gamepadData.keysPressed['76'])
+            lookX += range
+
+		moveX += gamepadData.driveJoystickData.x
+    	moveY += gamepadData.driveJoystickData.y
+
+    	if(moveX || moveY){
+    		playAction(run)
+    	} else {
+    		playAction(wait)
+    	}
+
+    	//apply rotation
+    	character.rotation.z = Math.atan2(moveX, moveY)
 	}
 
-	// Called by the render loop
+  	function animate(){
 
-	function updateCrossFadeControls() {
+		var delta = clock.getDelta();
 
-		crossFadeControls.forEach( function ( control ) {
-
-			control.setDisabled();
-
-		} );
-
-		if ( fightWeight === 1 && tposeWeight === 0 && punchWeight === 0 ) {
-
-			crossFadeControls[ 1 ].setEnabled();
-
+		if(mixer){
+	  		mixer.update(delta)
 		}
 
-		if ( fightWeight === 0 && tposeWeight === 0 && punchWeight === 1 ) {
+    	if(controls){
+    		controls.update();
+    	}
 
-			crossFadeControls[ 0 ].setEnabled();
+    	if(controlLoopRunning){
+    		controlLoop(character, delta)
+    	}
 
-		}
+		renderer.render(scene, camera)
 
+		requestAnimationFrame(animate)
+  	}
+
+  	function onPlayButton(){
+  		setPlaying(!playing)
+  	}
+
+  	function onGamepadEvent(evt, data){
+        if(evt === 'driveJoystick'){
+            gamepadData.driveJoystickData = data
+        }
+        else if(evt === 'lookJoystick'){
+            gamepadData.lookJoystickData = data
+        }
+        else if(evt === 'button'){
+            gamepadData.buttonsPressed[data.button] = data.pressed
+        }
+        else if(evt === 'mouse'){
+            //placeholder
+        }
+        else if(evt === 'key'){
+            gamepadData.keysPressed[data.key] = data.pressed
+        }
 	}
 
-	function onLoad(){
-		setShowText(false)
+  	var i = 0
+	function sceneClick(){
+		playAction(kick)
 	}
 
-	function onTextFade(){
-		setShowLoading(false)
-	}
+	const defaultNippleSize=100 
+	const defaultButtonSize=40
+	const defaultNippleColor='black'
+
+	const driveJoystickOptions = {
+        mode: 'static',
+        restOpacity: 1,
+        size: defaultNippleSize,
+        color: defaultNippleColor,
+        position: { top: '50%', left: '50%' },
+        fadeTime: 0,
+    }
 
 	return (
-		<div className="App">
+		<div className="App h-100 w-100 position-absolute bg-color">
 			<CSSTransition
 					in={showLoading}
 					unmountOnExit
 					timeout={1200}
 					classNames="fade"
 			>
-				<div className='h-100 w-100 position-absolute z-9 bg d-flex flex-column justify-content-center align-items-center'>
+				<div className='h-100 w-100 position-absolute z-9 bg-color d-flex flex-column justify-content-center align-items-center'>
 					<CSSTransition
-							in={showText}
+							in={showLoadingText}
 							unmountOnExit
 							timeout={1200}
 							classNames="fade"
-							onExited={onTextFade}
+							onExited={()=>{setShowLoading(false)}}
 					>
-						<div className = 'd-flex justify-content-center'>
-							<h1>Loading
-							<span className='bounce'>.</span>
-							<span className='bounce'>.</span>
-							<span className='bounce'>.</span>
-							</h1>
+						<div className = 'd-flex align-items-center justify-content-center'>
+							<svg width="20" className='m-4 bounce'>
+						    	<circle cx={10} cy={10} r={10} />
+							</svg>
+							<svg width="20" className='m-4 bounce'>
+						    	<circle cx={10} cy={10} r={10} />
+							</svg>
+							<svg width="20" className='m-4 bounce'>
+						    	<circle cx={10} cy={10} r={10} />
+							</svg>
 						</div>
 					</CSSTransition>
 				</div>
 			</CSSTransition>
+			<div className="h-100 w-100 position-absolute text-color d-flex justify-content-center align-items-center text-center">
+				<h1 className = "grow">サムライを台無しにしないでください</h1>
+			</div>
+			<div className = 'z-8 top p-3 d-flex justify-content-center text-color'>
+				<button 
+					className='btn-naked'
+					>
+					<h2>ひよことベンが作った</h2>
+				</button>
+			</div>
+			<div className = 'z-8 bottom p-3 d-flex justify-content-center text-color'>
+				<button 
+					className='btn-naked'
+					onClick={sceneClick}
+					>
+					<h2>キック</h2>
+				</button>
+				<button 
+					className='btn-naked'
+					onClick={onPlayButton}
+				>
+					{
+					playing ?
+					<h2 className = 'play play-active'><FaVolumeUp /></h2>
+					:
+					<h2 className = 'play'><FaVolumeUp /></h2>
+					}
+				</button>
+			</div>
+			<ReactHowler
+				src="/assets/kungfufighting.mp3"
+				playing={playing}
+				loop={true}
+				html5={isIOS ? true : false}
+			  />
+			<Gamepad 
+				onEvent={onGamepadEvent} 
+				style={{zIndex:1, position: 'absolute', padding: '2rem', height: '100%', width: '100%'}}
+			    joysticks={[
+			        {
+			            name: 'driveJoystick',
+			            position: '7',
+			            options: driveJoystickOptions,
+			        }
+			    ]}
+				/>
 			<ThreeSceneRenderer 
-				className='h-100 w-100 position-fixed bg-gradient' 
+				className='h-100 w-100 position-absolute' 
 				adaptToDeviceRatio 
-				gammaCorrect
-				onMount={createScene}
+				onMount={extendScene}
 			/>
 		</div>
 	);

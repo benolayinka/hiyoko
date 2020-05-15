@@ -1,25 +1,99 @@
-.bg-gradient {
-	background-image: linear-gradient(#ffffff, #d6d6d6);
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400&display=swap');
+
+.bg-color {
+  background-color: gold;
 }
-a {
-	color: #f00;
+
+.text-color {
+  font-family: Noto Sans JP, sans serif;
+    color: black;
 }
-.ac {  /* prevent dat-gui from being selected */
-	-webkit-user-select: none;
-	-moz-user-select: none;
-	-ms-user-select: none;
-	user-select: none;
+
+.z-8 {
+  z-index: 8;
 }
-.no-pointer-events {
-	pointer-events: none;
-}
-.control-disabled {
-	color: #888;
-	text-decoration: line-through;
-}
+
 .z-9 {
   z-index: 9;
 }
+
+.btn-naked {
+  outline: none;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  -webkit-user-select: none;
+  user-select: none;
+  color: inherit;
+}
+
+.btn-naked:focus {
+  outline: none;
+}
+
+.grow {
+    animation: grow 1s ease-in-out infinite alternate;
+    -webkit-animation: grow 1s ease-in-out infinite alternate;
+}
+
+@keyframes grow {
+    0% {
+        transform: scale(1.0);
+    }
+    100% {
+        transform: scale(2.0);
+    }
+}
+
+.bottom {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+}
+
+.top {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+}
+
+.play-active {
+  animation: play-active 0.46975s ease-in-out infinite alternate;
+    -webkit-animation: play-active 0.46975s ease-in-out infinite alternate;
+}
+
+@keyframes play-active {
+    0% {
+        transform: scale(1.5);
+    }
+    100% {
+        transform: scale(1.0);
+    }
+}
+
+.bounce:nth-child(1){
+  animation: bounce 1600ms ease-in-out 10ms infinite;
+}
+.bounce:nth-child(2){
+  animation: bounce 1600ms ease-in-out 400ms infinite;
+}
+.bounce:nth-child(3){
+  animation: bounce 1600ms ease-in-out 10ms infinite;
+}
+@keyframes bounce {
+  0%,100% {
+    transform: translateY(0px);
+  }
+  20%,80% {
+    transform: translateY(0px);
+  }
+  50% {
+    transform: translateY(-60px);
+  }
+}
+
 .fade.fade-enter {
   opacity: 0;
 }
@@ -40,27 +114,4 @@ a {
 .fade-appear-active {
   opacity: 1;
   transition: opacity 1200ms;
-}
-.bg {
-	background-color: black;
-}
-.bounce:nth-child(1){
-  animation: bounce 1600ms ease-in-out 10ms infinite;
-}
-.bounce:nth-child(2){
-  animation: bounce 1600ms ease-in-out 400ms infinite;
-}
-.bounce:nth-child(3){
-  animation: bounce 1600ms ease-in-out 10ms infinite;
-}
-@keyframes bounce {
-  0%,100% {
-    transform: translateY(0px);
-  }
-  20%,80% {
-    transform: translateY(0px);
-  }
-  50% {
-    transform: translateY(-60px);
-  }
 }

@@ -4,6 +4,7 @@ import 'bootstrap/dist/css/bootstrap.min.css';
 import * as THREE from 'three'
 import * as CANNON from 'cannon-es'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { setContent, showEdges, setEdgeColor, setEdgeWidth } from '@bit/benolayinka.benolayinka.utils'
 import ThreeSceneRenderer from '@bit/benolayinka.benolayinka.three-scene-renderer'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -72,7 +73,30 @@ function App() {
 
 	  	let loader = new GLTFLoader()
 
-	  	loader.load('assets/samurai_animated.glb', (gltf)=>{
+	  	// Custom-built version of DRACOLoader, for Node.js.
+		const NodeDRACOLoader = require('./NodeDRACOLoader.js');
+
+		const DRACOLoader = new NodeDRACOLoader()
+
+		// GLTFLoader prefetches the decoder module, when Draco is needed, to speed up
+		// parsing later. This isn't necessary for our custom decoder, so set the
+		// method to a no-op.
+		DRACOLoader.getDecoderModule = () => {};
+		DRACOLoader.preload = () => {};
+
+		loader.setDRACOLoader( DRACOLoader );
+
+	  	//let dracoLoader = new DRACOLoader();
+		//dracoLoader.setDecoderPath( 'three/' );
+
+	  	// Optional: Provide a DRACOLoader instance to decode compressed mesh data
+		//const decoder = require('draco3dgltf').createDecoderModule();
+		
+		//loader.setDRACOLoader(decoder);
+
+		//loader.setDRACOLoader( new DRACOLoader() );
+
+	  	loader.load('assets/samurai_animated_draco.drc', (gltf)=>{
 
 	  		gltf.scene.traverse((mesh)=>{
 
